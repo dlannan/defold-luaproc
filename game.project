@@ -1,0 +1,22 @@
+[bootstrap]
+main_collection = /example/example.collectionc
+
+[script]
+shared_state = 1
+
+[display]
+width = 960
+height = 640
+
+[project]
+title = defold-luaproc
+custom_resources = example/
+developer = Kakutai Pty Ltd
+publisher = Kakutai Pty Ltd
+
+[library]
+include_dirs = myextension
+
+[graphics]
+max_characters = 16384
+

@@ -1,0 +1,141 @@
+-- Luaproc example.
+--   The example provides separate examples of using multiple processes to solve concurrent execution problems.
+--
+--  First test shows how to extract three processes of a http get into three separate files at the same timer.
+--   The sample show timing for 3, vs timing for 3 in sequence. 
+--  Second test shows the display of three data streams at once into a 'split' buffer (no need for mutexing the output)
+--   There are 4 workers outputting data to the 4 quadrants of the screen using 4 different files. 
+--  Third test executes 10 workers to execute mandebrot output and the display using it to show a continuous
+--   zoom into the mandelbrot. The workers only start when the main thread does a request with params.
+--
+-- Profiling output is shown on the display if enabled.
+--
+
+local function testhttp_noproc(id, testfile)
+
+	-- create a sender lua process
+	local fh = io.popen("curl -L --no-progress-meter "..testfile)
+	if(fh) then 
+		local data = fh:read("*a")
+		fh:close()
+	end
+end	
+
+local function testhttp(id, testfile)
+
+	-- create a sender lua process
+	luaproc.newproc( function()
+
+		local fh = io.popen("curl -L --no-progress-meter "..testfile)
+		if(fh) then 
+			local data = fh:read("*a")
+			luaproc.send( "master_channel", data )
+			fh:close()
+			luaproc.send( "master_channel", "COMPLETE" )
+		end
+	end )
+end	
+
+local function testgui(id, testfile)
+
+	-- create a sender lua process
+	luaproc.newproc( function()
+
+		local fh = io.open("example/data/"..testfile, "r")
+		if(fh) then 
+			local line = fh:read(80)
+			while(line) do
+				luaproc.send( "gui"..id.."_channel", line )
+				line = fh:read(80)
+			end
+			fh:close()
+		end
+		-- Send a couple of blank lines at end 
+		luaproc.send( "gui"..id.."_channel", " \n \n" )
+	end )
+end	
+
+function init(self)
+
+	msg.post(".", "acquire_input_focus")
+
+	-- create an additional worker
+	luaproc.setnumworkers( 4 )		
+
+	-- This is the channel workers report their status to
+	local res, err = luaproc.newchannel( "master_channel" )
+
+	luaproc.newchannel( "gui1_channel" )
+	luaproc.newchannel( "gui2_channel" )
+	luaproc.newchannel( "gui3_channel" )
+	luaproc.newchannel( "gui4_channel" )
+	
+	pprint(luaproc)
+	self.complete = 0
+end
+
+function final(self)
+end
+
+function update(self, dt)
+
+	-- Check the channel if it has pending messages
+	local res = luaproc.receive( "master_channel", true )
+	-- if(res) then pprint(res) end
+	if(res == "COMPLETE") then 
+		self.complete = self.complete + 1
+		if(self.complete == 3) then 
+			print( "TOTAL LUAPROC COMPLETE: "..(os.clock()-self.tstart).." secs" )
+		end 
+	end
+
+	local gui1res = luaproc.receive( "gui1_channel", true )
+	if(gui1res) then msg.post("/go#example1", "gui1text", { line = gui1res }) end
+	local gui2res = luaproc.receive( "gui2_channel", true )
+	if(gui2res) then msg.post("/go#example1", "gui2text", { line = gui2res }) end
+	local gui3res = luaproc.receive( "gui3_channel", true )
+	if(gui3res) then msg.post("/go#example1", "gui3text", { line = gui3res }) end
+	local gui4res = luaproc.receive( "gui4_channel", true )
+	if(gui4res) then msg.post("/go#example1", "gui4text", { line = gui4res }) end
+end
+
+function on_message(self, message_id, message, sender)
+
+end
+
+function on_input(self, action_id, action)
+
+	-- Test luaproc multiple fetches iof csv files. Note: the luaproc version actually sends all the data on the channel as well!
+	if(action_id == hash("1_key") and action.released) then 
+
+		self.tstart = os.clock()
+		testhttp("1", "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_200KB_CSV-1.csv")
+		testhttp("2", "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_300KB_CSV-1.csv")
+		testhttp("3", "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_500KB_CSV-1.csv")
+	end 
+
+	-- Test no lua proc of same files fetched sequentially - noting there is nothing done with the data like luaproc.
+	if(action_id == hash("2_key") and action.released) then 
+	
+		self.tstart = os.clock()
+		testhttp_noproc("1", "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_200KB_CSV-1.csv")
+		testhttp_noproc("2", "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_300KB_CSV-1.csv")
+		testhttp_noproc("3", "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_500KB_CSV-1.csv")
+		print( "TOTAL NOPROC COMPLETE: "..(os.clock()-self.tstart).." secs" )
+	end
+
+	-- Test 4 luaprocs outputting four different files to four panels at once 
+	if(action_id == hash("3_key") and action.released) then 
+
+		testgui("1", "File-5xkZz.txt")
+		testgui("2", "File-aPqTB.txt")
+		testgui("3", "File-feL9l.txt")
+		testgui("4", "File-jGRqG.txt")
+	end
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Remove this function if not needed
+end
+
