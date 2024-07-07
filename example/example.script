@@ -11,6 +11,8 @@
 -- Profiling output is shown on the display if enabled.
 --
 
+local NUM_PROCS 	=  10
+
 local mandel = require("example.mandelbrot")
 
 local function split(str, pat)
@@ -126,7 +128,7 @@ function init(self)
 	mandel.setframebuffer(1)
 	
 	-- create an additional worker
-	luaproc.setnumworkers( 10 )		
+	luaproc.setnumworkers( NUM_PROCS )		
 
 	-- This is the channel workers report their status to
 	local res, err = luaproc.newchannel( "master_channel" )
@@ -176,7 +178,7 @@ function update(self, dt)
 		end 
 	end
 
-	if(self.reqframes < 10 and self.totalframes < 220) then 
+	if(self.reqframes < NUM_PROCS and self.totalframes < 220) then 
 		self.extents = rendermandel(self.extents, self.zoom, 1)
 		self.zoom = self.zoom*math.pow( 0.9, 0.01)
 		self.reqframes = self.reqframes + 1
