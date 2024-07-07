@@ -11,6 +11,27 @@
 -- Profiling output is shown on the display if enabled.
 --
 
+local mandel = require("example.mandelbrot")
+
+local function split(str, pat)
+	local t = {}  -- NOTE: use {n = 0} in Lua-5.0
+	local fpat = "(.-)" .. pat
+	local last_end = 1
+	local s, e, cap = str:find(fpat, 1)
+	while s do
+	   if s ~= 1 or cap ~= "" then
+		  table.insert(t, tonumber(cap))
+	   end
+	   last_end = e+1
+	   s, e, cap = str:find(fpat, last_end)
+	end
+	if last_end <= #str then
+	   cap = str:sub(last_end)
+	   table.insert(t, tonumber(cap))
+	end
+	return t
+ end
+
 local function testhttp_noproc(id, testfile)
 
 	-- create a sender lua process
@@ -40,7 +61,7 @@ local function testgui(id, testfile)
 
 	-- create a sender lua process
 	luaproc.newproc( function()
-
+		
 		local fh = io.open("example/data/"..testfile, "r")
 		if(fh) then 
 			local line = fh:read(80)
@@ -55,15 +76,61 @@ local function testgui(id, testfile)
 	end )
 end	
 
+local function rendermandel(extents, zoom, id)
+
+	-- pprint((action.x - 480).."  "..(action.y - 320))
+	-- create a sender lua process
+
+	local wide = (extents.x2 - extents.x1)
+	local high = (extents.y2 - extents.y1)
+
+	-- local posx = ((action.x - 480) / 296) * wide * 0.5
+	-- local posy = ((action.y - 320) / 296) * high * 0.5
+	-- posx = posx + wide * 0.5 + self.extents.x1 -- offset from center
+	-- posy = posy + high * 0.5 + self.extents.y1
+	-- print(posx, posy)
+
+	local posx = -1.4092667891257 -- -1.6
+	local posy = 0
+
+	local halfw = wide * zoom
+	local halfh = high * zoom
+	newextents = {
+		x1 = posx - halfw, y1 = posy - halfh,
+		x2 = posx + halfw, y2 = posy + halfh,
+	}
+	
+	luaproc.newproc( function()
+
+		local x1, y1, x2, y2 = luaproc.receive("mandel_channel")
+		
+		package.path = package.path..[[;F:\dev\defold\repos\defold-luaproc\example\?.lua]]
+		local tmandel = require("example.mandelbrot")
+		tmandel.setup( 512, 512, 1, true )
+		tmandel.makeframe( 1, { x1 = x1, y1 = y1, x2 = x2, y2 = y2 } )
+		local buff = table.concat(tmandel.frames[1].buffer, ",")
+		luaproc.send( "master_channel", "FRAME"..buff)
+	end )	
+
+	luaproc.send("mandel_channel", newextents.x1, newextents.y1, newextents.x2, newextents.y2 )
+	return newextents
+end
+
 function init(self)
-
 	msg.post(".", "acquire_input_focus")
+	msg.post("@render:", "use_camera_projection")
+	msg.post("/camera#camera", "acquire_camera_focus")
 
+	mandel.setup( 512, 512, 1 )
+	mandel.makeframe( 1 )
+	mandel.setframebuffer(1)
+	
 	-- create an additional worker
-	luaproc.setnumworkers( 4 )		
+	luaproc.setnumworkers( 10 )		
 
 	-- This is the channel workers report their status to
 	local res, err = luaproc.newchannel( "master_channel" )
+	local res, err = luaproc.newchannel( "mandel_channel" )
 
 	luaproc.newchannel( "gui1_channel" )
 	luaproc.newchannel( "gui2_channel" )
@@ -72,6 +139,15 @@ function init(self)
 	
 	pprint(luaproc)
 	self.complete = 0
+	self.zoom = 0.5
+
+	self.extents = {
+		x1 = -2.2, y1 = -1.4,
+		x2 = 1.1, y2 = 1.4,
+	}
+
+	self.reqframes = 0
+	self.totalframes = 0
 end
 
 function final(self)
@@ -89,14 +165,32 @@ function update(self, dt)
 		end 
 	end
 
+	if(res) then 
+		local data = string.match(res, "^FRAME(.*)")
+		if(data) then 
+			mandel.frames[1].buffer = split(data, ",")
+			mandel.setframebuffer(1)
+			self.reqframes = self.reqframes - 1 
+			self.totalframes = self.totalframes + 1
+			pprint(self.totalframes)
+		end 
+	end
+
+	if(self.reqframes < 10 and self.totalframes < 220) then 
+		self.extents = rendermandel(self.extents, self.zoom, 1)
+		self.zoom = self.zoom*math.pow( 0.9, 0.01)
+		self.reqframes = self.reqframes + 1
+	end
+
 	local gui1res = luaproc.receive( "gui1_channel", true )
-	if(gui1res) then msg.post("/go#example1", "gui1text", { line = gui1res }) end
+	if(gui1res) then msg.post("/gui", "gui1text", { line = gui1res }) end
 	local gui2res = luaproc.receive( "gui2_channel", true )
-	if(gui2res) then msg.post("/go#example1", "gui2text", { line = gui2res }) end
+	if(gui2res) then msg.post("/gui", "gui2text", { line = gui2res }) end
 	local gui3res = luaproc.receive( "gui3_channel", true )
-	if(gui3res) then msg.post("/go#example1", "gui3text", { line = gui3res }) end
+	if(gui3res) then msg.post("/gui", "gui3text", { line = gui3res }) end
 	local gui4res = luaproc.receive( "gui4_channel", true )
-	if(gui4res) then msg.post("/go#example1", "gui4text", { line = gui4res }) end
+	if(gui4res) then msg.post("/gui", "gui4text", { line = gui4res }) end
+
 end
 
 function on_message(self, message_id, message, sender)
@@ -127,10 +221,16 @@ function on_input(self, action_id, action)
 	-- Test 4 luaprocs outputting four different files to four panels at once 
 	if(action_id == hash("3_key") and action.released) then 
 
+		msg.post("/gui", "enable_gui")
 		testgui("1", "File-5xkZz.txt")
 		testgui("2", "File-aPqTB.txt")
 		testgui("3", "File-feL9l.txt")
 		testgui("4", "File-jGRqG.txt")
+	end
+
+	-- Choose a mandebrot position and zoom to it. Roughly a 2x zoom
+	if(action_id == hash("touch") and action.released) then 
+		self.extents = rendermandel(self.extents,  self.zoom, 1)
 	end
 end
 

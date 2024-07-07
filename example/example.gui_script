@@ -2,6 +2,14 @@ local tinsert = table.insert
 local tremove = table.remove 
 local tconcat = table.concat
 
+local function setenabled( self, enable )
+	self.enabled = enable
+	gui.set_enabled(gui.get_node("box"), enable)
+	gui.set_enabled(gui.get_node("box1"), enable)
+	gui.set_enabled(gui.get_node("box2"), enable)
+	gui.set_enabled(gui.get_node("box3"), enable)
+end
+
 local LINE_SIZE = 20
 function init(self)
 
@@ -9,11 +17,8 @@ function init(self)
 	self.page2 = {}
 	self.page3 = {}
 	self.page4 = {}
-
-	-- gui.set_clipping_mode(gui.get_node("outtext1"), gui.CLIPPING_MODE_NONE)
-	-- gui.set_clipping_mode(gui.get_node("outtext2"), gui.CLIPPING_MODE_NONE)
-	-- gui.set_clipping_mode(gui.get_node("outtext3"), gui.CLIPPING_MODE_NONE)
-	-- gui.set_clipping_mode(gui.get_node("outtext4"), gui.CLIPPING_MODE_NONE)
+	
+	setenabled(self, false)
 end
 
 function final(self)
@@ -26,6 +31,10 @@ end
 
 function on_message(self, message_id, message, sender)
 
+	if(message_id == hash("enable_gui")) then 
+		if(self.enabled == false) then setenabled(self, true) end
+	end
+	
 	if(message_id == hash("gui1text")) then 
 		tinsert(self.page1, message.line)
 		if(#self.page1 > LINE_SIZE) then tremove(self.page1, 1) end
