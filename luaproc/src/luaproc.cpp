@@ -385,7 +385,13 @@ static void luaproc_loadbuffer( lua_State *parent, luaproc *lp,
   if ( ret != 0 ) {
     lua_pushstring( parent, lua_tostring( lp->lstate, -1 ));
     lua_close( lp->lstate );
-    luaL_error( parent, lua_tostring( parent, -1 ));
+#ifdef DM_PLATFORM_LINUX
+  /* For some reason the compiler wont allow this. 
+      Could add compiler params, this will do for now. */
+    luaL_error( parent, "Error loading buffer, check return." );
+#else
+    luaL_error( parent, lua_tostring( parent, -1 ) );
+#endif
   }
 }
 

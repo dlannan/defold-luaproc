@@ -108,7 +108,7 @@ local function rendermandel(extents, zoom, id)
 		
 		package.path = package.path..[[;F:\dev\defold\repos\defold-luaproc\example\?.lua]]
 		local tmandel = require("example.mandelbrot")
-		tmandel.setup( 512, 512, 1, true )
+		tmandel.setup( 256, 256, 1, true )
 		tmandel.makeframe( 1, { x1 = x1, y1 = y1, x2 = x2, y2 = y2 } )
 		local buff = table.concat(tmandel.frames[1].buffer, ",")
 		luaproc.send( "master_channel", "FRAME"..buff)
@@ -123,7 +123,7 @@ function init(self)
 	msg.post("@render:", "use_camera_projection")
 	msg.post("/camera#camera", "acquire_camera_focus")
 
-	mandel.setup( 512, 512, 1 )
+	mandel.setup( 256, 256, 1 )
 	mandel.makeframe( 1 )
 	mandel.setframebuffer(1)
 	
@@ -131,8 +131,8 @@ function init(self)
 	luaproc.setnumworkers( NUM_PROCS )		
 
 	-- This is the channel workers report their status to
-	local res, err = luaproc.newchannel( "master_channel" )
-	local res, err = luaproc.newchannel( "mandel_channel" )
+	luaproc.newchannel( "master_channel" )
+	luaproc.newchannel( "mandel_channel" )
 
 	luaproc.newchannel( "gui1_channel" )
 	luaproc.newchannel( "gui2_channel" )
@@ -153,6 +153,14 @@ function init(self)
 end
 
 function final(self)
+
+	luaproc.delchannel( "master_channel" )
+	luaproc.delchannel( "mandel_channel" )
+
+	luaproc.delchannel( "gui1_channel" )
+	luaproc.delchannel( "gui2_channel" )
+	luaproc.delchannel( "gui3_channel" )
+	luaproc.delchannel( "gui4_channel" )	
 end
 
 function update(self, dt)
@@ -174,7 +182,7 @@ function update(self, dt)
 			mandel.setframebuffer(1)
 			self.reqframes = self.reqframes - 1 
 			self.totalframes = self.totalframes + 1
-			pprint(self.totalframes)
+			pprint(self.totalframes.. "    "..self.reqframes)
 		end 
 	end
 

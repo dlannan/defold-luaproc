@@ -86,9 +86,13 @@ void *workermain( void *args ) {
 
       /* remove worker from workers table */
       lua_getglobal( workerls, LUAPROC_SCHED_WORKERS_TABLE );
+#ifdef DM_PLATFORM_WINDOWS
       pthread_t *tptr = new pthread_t;
       *tptr = pthread_self( );
       lua_pushlightuserdata( workerls, tptr);
+#else 
+      lua_pushlightuserdata( workerls, (void *)pthread_self());
+#endif
       lua_pushnil( workerls );
       lua_rawset( workerls, -3 );
       lua_pop( workerls, 1 );
@@ -328,9 +332,13 @@ void sched_join_workers( void ) {
   lua_getglobal( L, wtb );
   lua_pushnil( L );
   while ( lua_next( L, -2 ) != 0 ) {
+#ifdef DM_PLATFORM_WINDOWS    
     pthread_t *tptr = (pthread_t *)lua_touserdata( L, -2 );
     pthread_join( *tptr, NULL );
     delete tptr;
+#else
+  pthread_join( ( pthread_t )lua_touserdata( L, -2 ), NULL );
+#endif
     /* pop value, leave key for next iteration */
     lua_pop( L, 1 );
   }
