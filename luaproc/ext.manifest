@@ -2,7 +2,7 @@
 name: "luaproc"
 
 platforms:
-   x86_64-win32:
+    x86_64-win32:
         context:
             libs:       ["libpthreadVSE3"]
             defines:    ["WIN32"]

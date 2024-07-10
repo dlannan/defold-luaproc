@@ -15,24 +15,17 @@ local NUM_PROCS 	=  10
 
 local mandel = require("example.mandelbrot")
 
-local function split(str, pat)
-	local t = {}  -- NOTE: use {n = 0} in Lua-5.0
-	local fpat = "(.-)" .. pat
-	local last_end = 1
-	local s, e, cap = str:find(fpat, 1)
-	while s do
-	   if s ~= 1 or cap ~= "" then
-		  table.insert(t, tonumber(cap))
-	   end
-	   last_end = e+1
-	   s, e, cap = str:find(fpat, last_end)
+local function split(inputstr, sep)
+	if sep == nil then
+		sep = "%s"
 	end
-	if last_end <= #str then
-	   cap = str:sub(last_end)
-	   table.insert(t, tonumber(cap))
+	local t = {}
+	for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+		table.insert(t, str)
 	end
 	return t
- end
+end
+
 
 local function testhttp_noproc(id, testfile)
 
@@ -176,9 +169,9 @@ function update(self, dt)
 	end
 
 	if(res) then 
-		local data = string.match(res, "^FRAME(.*)")
-		if(data) then 
-			mandel.frames[1].buffer = split(data, ",")
+		local cmd = string.sub(res, 1, 5)
+		if(cmd == "FRAME") then 
+			mandel.frames[1].buffer = split(string.sub(res, 6, -1), ",")
 			mandel.setframebuffer(1)
 			self.reqframes = self.reqframes - 1 
 			self.totalframes = self.totalframes + 1

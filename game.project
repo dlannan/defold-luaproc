@@ -10,9 +10,10 @@ height = 640
 
 [project]
 title = defold-luaproc
-custom_resources = example/
+custom_resources = 
 developer = Kakutai Pty Ltd
 publisher = Kakutai Pty Ltd
+bundle_resources = example/madelbrot.lua, example/data/
 
 [library]
 include_dirs = myextension
